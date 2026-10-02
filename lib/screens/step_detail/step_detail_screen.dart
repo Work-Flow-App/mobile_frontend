@@ -12,6 +12,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:mobile_frontend/widgets/persistent_text_field.dart';
+import 'package:mobile_frontend/screens/step_detail/multi_attachment_upload_sheet.dart';
 
 class StepDetailScreen extends ConsumerStatefulWidget {
   // CHANGED: Accept the full JobData wrapper instead of just JobStep
@@ -997,242 +998,20 @@ class _TimelineBottomSheetState extends ConsumerState<TimelineBottomSheet> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return _AttachmentUploadSheet(
-          onUpload: (path, type, desc) async {
+        return MultiAttachmentUploadSheet(
+          onUploadItem: (path, type, desc) async {
             await ref
                 .read(jobServiceProvider)
                 .addAttachment(widget.step.id, path, type, desc);
+          },
+          onUploadComplete: () {
             ref.refresh(stepTimelineProvider(widget.step.id).future);
             if (mounted) Navigator.pop(context);
           },
         );
       },
-    );
-  }
-}
-
-// =========================================================================
-// WIDGET: Attachment Sheet
-// =========================================================================
-class _AttachmentUploadSheet extends StatefulWidget {
-  final Future<void> Function(String, StepDiscussionType, String) onUpload;
-
-  const _AttachmentUploadSheet({required this.onUpload});
-
-  @override
-  State<_AttachmentUploadSheet> createState() => _AttachmentUploadSheetState();
-}
-
-class _AttachmentUploadSheetState extends State<_AttachmentUploadSheet> {
-  final _descController = TextEditingController();
-  StepDiscussionType _selectedType = StepDiscussionType.GENERAL;
-  String? _selectedPath;
-  bool _isUploading = false;
-
-  Future<void> _pickFile(int type) async {
-    String? path;
-    try {
-      if (type == 0 || type == 1) {
-        final img = await ImagePicker().pickImage(
-          source: type == 0 ? ImageSource.camera : ImageSource.gallery,
-          imageQuality: 70,
-          maxWidth: 1920,
-        );
-        path = img?.path;
-      } else {
-        final res = await FilePicker.platform.pickFiles();
-        if (res != null && res.files.isNotEmpty) {
-          path = res.files.single.path;
-        }
-      }
-
-      if (path != null) {
-        setState(() => _selectedPath = path);
-      }
-    } catch (e) {
-      // Catch permission errors or camera unavailability
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error picking file: $e"),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 16,
-        right: 16,
-        top: 16,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Upload Attachment",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            if (_selectedPath == null)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildUploadOption(
-                    Icons.camera_alt,
-                    Colors.blue,
-                    "Camera",
-                    () => _pickFile(0),
-                  ),
-                  _buildUploadOption(
-                    Icons.photo_library,
-                    Colors.purple,
-                    "Gallery",
-                    () => _pickFile(1),
-                  ),
-                  _buildUploadOption(
-                    Icons.insert_drive_file,
-                    Colors.orange,
-                    "File",
-                    () => _pickFile(2),
-                  ),
-                ],
-              )
-            else
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.check_circle, color: Colors.green),
-                title: Text(
-                  _selectedPath!.split('/').last,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: _isUploading
-                      ? null
-                      : () => setState(() => _selectedPath = null),
-                ),
-              ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<StepDiscussionType>(
-              value: _selectedType,
-              decoration: const InputDecoration(
-                labelText: "Attachment Type",
-                border: OutlineInputBorder(),
-              ),
-              items: StepDiscussionType.values
-                  .where((e) => e != StepDiscussionType.UNKNOWN)
-                  .map(
-                    (t) => DropdownMenuItem(
-                      value: t,
-                      child: Row(
-                        children: [
-                          Icon(Icons.circle, size: 12, color: t.color),
-                          const SizedBox(width: 8),
-                          Text(t.label),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: _isUploading
-                  ? null
-                  : (val) => setState(() => _selectedType = val!),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descController,
-              enabled: !_isUploading,
-              decoration: const InputDecoration(
-                labelText: "Description (Optional)",
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                onPressed: (_selectedPath == null || _isUploading)
-                    ? null
-                    : () async {
-                        setState(() {
-                          _isUploading = true;
-                        });
-                        try {
-                          await widget.onUpload(
-                            _selectedPath!,
-                            _selectedType,
-                            _descController.text,
-                          );
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("Upload failed: $e")),
-                            );
-                          }
-                        } finally {
-                          if (mounted) {
-                            setState(() {
-                              _isUploading = false;
-                            });
-                          }
-                        }
-                      },
-                child: _isUploading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text("Upload"),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUploadOption(
-    IconData icon,
-    Color color,
-    String label,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: _isUploading ? null : onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            backgroundColor: color.withOpacity(0.2),
-            radius: 24,
-            child: Icon(icon, color: color),
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
     );
   }
 }

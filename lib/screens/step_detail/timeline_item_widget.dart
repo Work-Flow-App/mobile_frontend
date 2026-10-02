@@ -63,7 +63,7 @@ class TimelineItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final time = DateFormat.jm().format(event.createdAt);
+    final time = DateFormat('MMM d, yyyy • h:mm a').format(event.createdAt);
     final displayName = event.actorId == currentWorkerId
         ? "You"
         : (event.actorUsername ?? "User #${event.actorId}");

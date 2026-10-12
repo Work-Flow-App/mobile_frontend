@@ -184,6 +184,15 @@ class HomeDashboard extends ConsumerWidget {
                                 context.push('/my-assets');
                               },
                             ),
+                            _buildMenuItem(
+                              context: context,
+                              icon: Icons.assignment_outlined,
+                              title: 'My Forms',
+                              onTap: () {
+                                Navigator.pop(context);
+                                context.push('/my-forms');
+                              },
+                            ),
 
                             // You can add more mock items here to test the scroll!
                             const SizedBox(

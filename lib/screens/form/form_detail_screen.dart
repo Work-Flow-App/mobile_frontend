@@ -15,7 +15,6 @@ class FormDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _FormDetailScreenState extends ConsumerState<FormDetailScreen> {
-  // --- NEW: Global Key to access the DynamicFormBuilderState ---
   final GlobalKey<DynamicFormBuilderState> _formBuilderKey =
       GlobalKey<DynamicFormBuilderState>();
 
@@ -57,7 +56,8 @@ class _FormDetailScreenState extends ConsumerState<FormDetailScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
+        builder: (_) =>
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
       );
       final updatedForm = await ref
           .read(formServiceProvider)
@@ -76,29 +76,36 @@ class _FormDetailScreenState extends ConsumerState<FormDetailScreen> {
   }
 
   Future<void> _handleFinalSubmit() async {
-    // 1. Trigger Frontend Validation!
     if (!_formBuilderKey.currentState!.validateForm()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
+        SnackBar(
+          content: const Text(
             "Please fill out all required fields before submitting.",
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
-      return; // Stop right here!
+      return;
     }
 
-    // 2. Automatically save any lingering edits to the backend first
     await _handleSaveValues(_formBuilderKey.currentState!.currentValues);
 
-    // 3. Confirm Intent
     bool confirm =
         await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text("Submit Form?"),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              "Submit Form?",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             content: const Text(
               "Once submitted, you will not be able to edit this form. Proceed?",
             ),
@@ -109,7 +116,13 @@ class _FormDetailScreenState extends ConsumerState<FormDetailScreen> {
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
                 child: const Text("Submit"),
               ),
             ],
@@ -119,7 +132,6 @@ class _FormDetailScreenState extends ConsumerState<FormDetailScreen> {
 
     if (!confirm) return;
 
-    // 4. Hit Submit API
     setState(() => _isSubmitting = true);
     try {
       final updatedForm = await ref
@@ -167,82 +179,71 @@ class _FormDetailScreenState extends ConsumerState<FormDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              currentForm.title,
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              currentForm.templateName,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 1,
-        actions: [
-          if (_isDownloadingPdf)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.black,
+      backgroundColor: const Color(0xFFF8FAFC),
+      // Wrapping with NestedScrollView to achieve the Hide-on-scroll AppBar behavior
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  currentForm.title,
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.picture_as_pdf),
-              tooltip: "Download PDF",
-              onPressed: _downloadPdf,
+                Text(
+                  currentForm.templateName,
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-
-          if (currentForm.status != FormSubmissionStatus.SUBMITTED)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: _isSubmitting
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.0),
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                    )
-                  // --- CALL THE NEW SUBMIT METHOD ---
-                  : TextButton(
-                      onPressed: _handleFinalSubmit,
-                      child: const Text(
-                        "Submit",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black87,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            floating: true, // Enables hiding on scroll down
+            snap: true, // Snaps instantly back when scrolling up
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1.0),
+              child: Container(color: Colors.grey.shade200, height: 1.0),
+            ),
+            actions: [
+              if (_isDownloadingPdf)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.black,
                     ),
-            ),
+                  ),
+                )
+              else
+                IconButton(
+                  icon: const Icon(Icons.picture_as_pdf_rounded),
+                  tooltip: "Download PDF",
+                  onPressed: _downloadPdf,
+                ),
+            ],
+          ),
         ],
-      ),
-      body: Container(
-        color: Colors.grey.shade100,
-        child: DynamicFormBuilder(
-          key: _formBuilderKey, // --- ATTACH THE KEY HERE ---
+        body: DynamicFormBuilder(
+          key: _formBuilderKey,
           form: currentForm,
           onSave: _handleSaveValues,
           onFileUpload: _handleFileUpload,
+          onSubmit: _handleFinalSubmit, // Handled inside bottom bar now
+          isSubmitting: _isSubmitting,
         ),
       ),
     );

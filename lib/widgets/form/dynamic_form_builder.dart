@@ -14,11 +14,17 @@ class DynamicFormBuilder extends StatefulWidget {
   final Function(List<FormFieldValueDto>) onSave;
   final Future<void> Function(int fieldId, File file) onFileUpload;
 
+  // NEW: Added Submit parameters to handle side-by-side buttons
+  final VoidCallback? onSubmit;
+  final bool isSubmitting;
+
   const DynamicFormBuilder({
     super.key,
     required this.form,
     required this.onSave,
     required this.onFileUpload,
+    this.onSubmit,
+    this.isSubmitting = false,
   });
 
   @override
@@ -33,16 +39,14 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
   bool get _isFullySubmitted =>
       widget.form.status == FormSubmissionStatus.SUBMITTED;
 
-  // --- Public methods for the Parent Screen ---
   bool validateForm() {
     return _formKey.currentState?.validate() ?? false;
   }
 
   List<FormFieldValueDto> get currentValues {
-    _formKey.currentState?.save(); // Ensures latest typed text is captured
+    _formKey.currentState?.save();
     return _currentValues.values.toList();
   }
-  // ------------------------------------------------
 
   void _updateValue(int fieldId, FormFieldValueDto dto) {
     _currentValues[fieldId] = dto;
@@ -55,77 +59,131 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
       child: Column(
         children: [
           Expanded(
-            child: ListView.builder(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              itemCount: widget.form.values.length,
-              itemBuilder: (context, index) {
-                final field = widget.form.values[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
-                  child: _buildField(field),
-                );
-              },
+              child: Column(
+                children: widget.form.values.map((field) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 20.0),
+                    child: _buildField(field),
+                  );
+                }).toList(),
+              ),
             ),
           ),
           if (!_isFullySubmitted)
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 15,
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 20,
                     offset: const Offset(0, -5),
                   ),
                 ],
               ),
               child: SafeArea(
                 top: false,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isSaving
-                        ? null
-                        : () async {
-                            _formKey.currentState!.save();
-                            setState(() => _isSaving = true);
-                            await widget.onSave(_currentValues.values.toList());
-                            if (mounted) setState(() => _isSaving = false);
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                child: Row(
+                  children: [
+                    // --- SAVE DRAFT BUTTON ---
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: OutlinedButton(
+                          onPressed: (_isSaving || widget.isSubmitting)
+                              ? null
+                              : () async {
+                                  _formKey.currentState!.save();
+                                  setState(() => _isSaving = true);
+                                  await widget.onSave(
+                                    _currentValues.values.toList(),
+                                  );
+                                  if (mounted)
+                                    setState(() => _isSaving = false);
+                                },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.blue.shade800,
+                            side: BorderSide(
+                              color: Colors.blue.shade800,
+                              width: 1.5,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: _isSaving
+                              ? SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.blue.shade800,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : const Text(
+                                  "Save Draft",
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
                       ),
                     ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.5,
+                    const SizedBox(width: 16),
+                    // --- SUBMIT BUTTON ---
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: (widget.isSubmitting || _isSaving)
+                              ? null
+                              : widget.onSubmit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade600,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          )
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.save_outlined),
-                              SizedBox(width: 8),
-                              Text(
-                                "Save Draft",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
                           ),
-                  ),
+                          child: widget.isSubmitting
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_outline_rounded,
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "Submit",
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -136,29 +194,50 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
 
   Widget _buildField(FormFieldValueResponse field) {
     if (field.fieldType == FormFieldType.SECTION) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      return Container(
+        margin: const EdgeInsets.only(top: 24, bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.indigo.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.indigo.shade100),
+        ),
+        child: Row(
           children: [
-            Text(
-              field.fieldLabel.toUpperCase(),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-                color: Colors.blueGrey.shade700,
+            Icon(
+              Icons.label_important_rounded,
+              color: Colors.indigo.shade400,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    field.fieldLabel.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                      color: Colors.indigo.shade900,
+                    ),
+                  ),
+                  if (field.description != null &&
+                      field.description!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text(
+                        field.description!,
+                        style: TextStyle(
+                          color: Colors.indigo.shade300,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            if (field.description != null && field.description!.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                field.description!,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Divider(height: 1, thickness: 1, color: Colors.grey.shade300),
           ],
         ),
       );
@@ -168,44 +247,91 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
     bool readOnly = _isFullySubmitted || isCompanyField;
     bool shouldValidate = field.required && !readOnly;
 
+    Color accentColor = _getAccentColor(field.fieldType);
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: readOnly ? Colors.grey.shade50 : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           if (!readOnly)
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 15,
+              offset: const Offset(0, 6),
             ),
         ],
         border: Border.all(
           color: readOnly ? Colors.grey.shade200 : Colors.grey.shade100,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          _buildLabel(
-            field.fieldLabel,
-            field.required,
-            readOnly,
-            isCompanyField,
-          ),
-          if (field.description != null && field.description!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                field.description!,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-              ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 4,
+              color: readOnly ? Colors.grey.shade400 : accentColor,
             ),
-          _renderInputControl(field, readOnly, shouldValidate),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildLabel(
+                  field.fieldLabel,
+                  field.required,
+                  readOnly,
+                  isCompanyField,
+                ),
+                if (field.description != null && field.description!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      field.description!,
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                _renderInputControl(
+                  field,
+                  readOnly,
+                  shouldValidate,
+                  accentColor,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Color _getAccentColor(FormFieldType type) {
+    switch (type) {
+      case FormFieldType.TEXT:
+      case FormFieldType.TEXT_AREA:
+        return Colors.blue.shade500;
+      case FormFieldType.DATE:
+        return Colors.purple.shade400;
+      case FormFieldType.BOOLEAN:
+      case FormFieldType.CHECKBOX:
+        return Colors.green.shade500;
+      case FormFieldType.DROPDOWN:
+      case FormFieldType.MULTI_SELECT:
+        return Colors.orange.shade500;
+      case FormFieldType.FILE:
+        return Colors.red.shade400;
+      default:
+        return Colors.grey.shade500;
+    }
   }
 
   Widget _buildLabel(
@@ -225,15 +351,15 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                 text: label,
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: readOnly ? Colors.grey.shade700 : Colors.black87,
+                  fontWeight: FontWeight.w700,
+                  color: readOnly ? Colors.grey.shade600 : Colors.black87,
                 ),
                 children: [
                   if (isRequired && !readOnly)
-                    const TextSpan(
+                    TextSpan(
                       text: ' *',
                       style: TextStyle(
-                        color: Colors.red,
+                        color: Colors.red.shade600,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -244,10 +370,31 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
           if (readOnly && !_isFullySubmitted && isCompanyField)
             Tooltip(
               message: "Filled by Company",
-              child: Icon(
-                Icons.lock_outline,
-                size: 16,
-                color: Colors.grey.shade400,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 12,
+                      color: Colors.grey.shade700,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "Company",
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -259,6 +406,7 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
     FormFieldValueResponse field,
     bool readOnly,
     bool shouldValidate,
+    Color accentColor,
   ) {
     switch (field.fieldType) {
       case FormFieldType.TEXT:
@@ -276,17 +424,22 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
             fillColor: readOnly ? Colors.transparent : Colors.grey.shade50,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: readOnly ? Colors.transparent : Colors.grey.shade300,
+                color: readOnly ? Colors.transparent : Colors.grey.shade200,
+                width: 1.5,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.black, width: 1.5),
+              borderSide: BorderSide(color: accentColor, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.red.shade300, width: 1.5),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -314,22 +467,37 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
           currentVal = null;
         return DropdownButtonFormField<String>(
           value: currentVal,
+          // Expanded standard list items slightly
+          isExpanded: true,
           items: field.options
-              .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+              .map(
+                (opt) => DropdownMenuItem(
+                  value: opt,
+                  child: Text(opt, overflow: TextOverflow.ellipsis),
+                ),
+              )
               .toList(),
           icon: Icon(
-            Icons.keyboard_arrow_down,
-            color: readOnly ? Colors.grey.shade400 : Colors.black,
+            Icons.expand_more_rounded,
+            color: readOnly ? Colors.grey.shade400 : accentColor,
           ),
           decoration: InputDecoration(
             filled: true,
             fillColor: readOnly ? Colors.transparent : Colors.grey.shade50,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: readOnly ? Colors.transparent : Colors.grey.shade300,
+                color: readOnly ? Colors.transparent : Colors.grey.shade200,
+                width: 1.5,
               ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: accentColor, width: 2),
             ),
           ),
           onChanged: readOnly
@@ -355,33 +523,47 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SwitchListTile(
-                  title: Text(
-                    state.value! ? "Yes" : "No",
-                    style: TextStyle(
-                      color: readOnly ? Colors.grey.shade600 : Colors.black,
-                      fontWeight: FontWeight.w500,
+                Container(
+                  decoration: BoxDecoration(
+                    color: state.value!
+                        ? accentColor.withOpacity(0.1)
+                        : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: state.value!
+                          ? accentColor.withOpacity(0.3)
+                          : Colors.grey.shade200,
                     ),
                   ),
-                  value: state.value!,
-                  activeColor: Colors.black,
-                  contentPadding: EdgeInsets.zero,
-                  onChanged: readOnly
-                      ? null
-                      : (val) {
-                          state.didChange(val);
-                          _updateValue(
-                            field.fieldId,
-                            FormFieldValueDto(
-                              fieldId: field.fieldId,
-                              booleanValue: val,
-                            ),
-                          );
-                        },
+                  child: SwitchListTile(
+                    title: Text(
+                      state.value! ? "Yes" : "No",
+                      style: TextStyle(
+                        color: readOnly ? Colors.grey.shade600 : Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    value: state.value!,
+                    activeColor: accentColor,
+                    inactiveTrackColor: Colors.grey.shade200,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    onChanged: readOnly
+                        ? null
+                        : (val) {
+                            state.didChange(val);
+                            _updateValue(
+                              field.fieldId,
+                              FormFieldValueDto(
+                                fieldId: field.fieldId,
+                                booleanValue: val,
+                              ),
+                            );
+                          },
+                  ),
                 ),
                 if (state.hasError)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.only(top: 8, left: 4),
                     child: Text(
                       state.errorText!,
                       style: TextStyle(
@@ -409,6 +591,7 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                 _DatePickerWidget(
                   field: field,
                   readOnly: readOnly,
+                  accentColor: accentColor,
                   onDateSelected: (dateStr) {
                     state.didChange(dateStr);
                     _updateValue(
@@ -457,7 +640,7 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Wrap(
-                  spacing: 10,
+                  spacing: 8,
                   runSpacing: 10,
                   children: field.options.map((opt) {
                     final isSelected = state.value!.contains(opt);
@@ -477,12 +660,14 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                       backgroundColor: readOnly
                           ? Colors.transparent
                           : Colors.grey.shade100,
-                      selectedColor: readOnly
-                          ? Colors.grey.shade400
-                          : Colors.black,
+                      selectedColor: accentColor,
                       checkmarkColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         side: BorderSide(
                           color: isSelected
                               ? Colors.transparent
@@ -493,11 +678,10 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                           ? null
                           : (val) {
                               final newList = List<String>.from(state.value!);
-                              if (val) {
+                              if (val)
                                 newList.add(opt);
-                              } else {
+                              else
                                 newList.remove(opt);
-                              }
                               state.didChange(newList);
                               _updateValue(
                                 field.fieldId,
@@ -549,18 +733,28 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                     child: InkWell(
                       onTap: () =>
                           _viewAttachment(context, field.fileUrl, isImage),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                       child: Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
-                          border: Border.all(color: Colors.grey.shade200),
-                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,
+                          border: Border.all(
+                            color: accentColor.withOpacity(0.3),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentColor.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: isImage
                             ? ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                                 child: Image.network(
                                   field.fileUrl!,
                                   height: 180,
@@ -569,21 +763,18 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                                 ),
                               )
                             : Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8.0,
-                                  horizontal: 8.0,
-                                ),
+                                padding: const EdgeInsets.all(12.0),
                                 child: Row(
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.shade50,
-                                        borderRadius: BorderRadius.circular(8),
+                                        color: accentColor.withOpacity(0.1),
+                                        shape: BoxShape.circle,
                                       ),
                                       child: Icon(
-                                        Icons.description,
-                                        color: Colors.blue.shade600,
+                                        Icons.insert_drive_file_rounded,
+                                        color: accentColor,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -591,16 +782,17 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                                       child: Text(
                                         field.fileName ?? "Attached File",
                                         style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: FontWeight.w700,
                                           color: Colors.black87,
                                         ),
-                                        maxLines: 1,
+                                        // FIX: Allow wrapping for file names
+                                        maxLines: 4,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     Icon(
-                                      Icons.open_in_new,
-                                      color: Colors.grey.shade500,
+                                      Icons.open_in_new_rounded,
+                                      color: Colors.grey.shade400,
                                       size: 20,
                                     ),
                                   ],
@@ -611,29 +803,41 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                   ),
 
                 if (!readOnly)
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: Icon(
-                        field.fileUrl == null
-                            ? Icons.add_circle_outline
-                            : Icons.change_circle_outlined,
-                      ),
-                      label: Text(
-                        field.fileUrl == null
-                            ? "Add Attachment"
-                            : "Replace Attachment",
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.black87,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: Colors.grey.shade300),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  InkWell(
+                    onTap: () => _showAttachmentOptions(context, field, state),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      decoration: BoxDecoration(
+                        color: accentColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: accentColor.withOpacity(0.4),
+                          style: BorderStyle.solid,
                         ),
                       ),
-                      onPressed: () =>
-                          _showAttachmentOptions(context, field, state),
+                      child: Column(
+                        children: [
+                          Icon(
+                            field.fileUrl == null
+                                ? Icons.cloud_upload_rounded
+                                : Icons.change_circle_rounded,
+                            color: accentColor,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            field.fileUrl == null
+                                ? "Tap to Upload or Draw"
+                                : "Replace Attachment",
+                            style: TextStyle(
+                              color: accentColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
 
@@ -658,8 +862,6 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
     }
   }
 
-  // --- Attachment Handlers ---
-
   void _viewAttachment(BuildContext context, String? url, bool isImage) async {
     if (url == null) return;
     if (isImage) {
@@ -667,7 +869,7 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
         context: context,
         builder: (_) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(0),
+          insetPadding: EdgeInsets.zero,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -698,12 +900,6 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Could not open file.')));
-        }
       }
     }
   }
@@ -716,44 +912,34 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
-      isScrollControlled: true, // Fix for landscape overflow
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => SafeArea(
         child: SingleChildScrollView(
-          // Fix for bottom overflow when space is constrained
           child: Padding(
             padding: EdgeInsets.only(
-              top: 20.0,
+              top: 16.0,
               bottom: 20.0 + MediaQuery.of(ctx).viewInsets.bottom,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 50,
+                  width: 40,
                   height: 5,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.image, color: Colors.blue.shade700),
-                  ),
-                  title: const Text(
-                    'Pick Image / Document',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  onTap: () async {
+                const SizedBox(height: 24),
+                _buildSheetAction(
+                  Icons.image_rounded,
+                  Colors.blue,
+                  'Pick File / Image',
+                  () async {
                     Navigator.pop(ctx);
                     FilePickerResult? result = await FilePicker.platform
                         .pickFiles(type: FileType.any);
@@ -766,20 +952,11 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                     }
                   },
                 ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.camera_alt, color: Colors.green.shade700),
-                  ),
-                  title: const Text(
-                    'Take a Photo',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  onTap: () async {
+                _buildSheetAction(
+                  Icons.camera_alt_rounded,
+                  Colors.green,
+                  'Take a Photo',
+                  () async {
                     Navigator.pop(ctx);
                     final ImagePicker picker = ImagePicker();
                     final XFile? photo = await picker.pickImage(
@@ -794,20 +971,11 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                     }
                   },
                 ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.draw, color: Colors.orange.shade700),
-                  ),
-                  title: const Text(
-                    'Draw / Sketch',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  onTap: () {
+                _buildSheetAction(
+                  Icons.draw_rounded,
+                  Colors.orange,
+                  'Draw / Sketch',
+                  () {
                     Navigator.pop(ctx);
                     Navigator.push(
                       context,
@@ -829,18 +997,39 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
       ),
     );
   }
-}
 
-// --- Specialized UI Widgets ---
+  Widget _buildSheetAction(
+    IconData icon,
+    MaterialColor color,
+    String title,
+    VoidCallback onTap,
+  ) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: color.shade50, shape: BoxShape.circle),
+        child: Icon(icon, color: color.shade700),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+      ),
+      onTap: onTap,
+    );
+  }
+}
 
 class _DatePickerWidget extends StatefulWidget {
   final FormFieldValueResponse field;
   final bool readOnly;
+  final Color accentColor;
   final Function(String) onDateSelected;
 
   const _DatePickerWidget({
     required this.field,
     required this.readOnly,
+    required this.accentColor,
     required this.onDateSelected,
   });
   @override
@@ -874,8 +1063,8 @@ class _DatePickerWidgetState extends State<_DatePickerWidget> {
                 builder: (context, child) {
                   return Theme(
                     data: Theme.of(context).copyWith(
-                      colorScheme: const ColorScheme.light(
-                        primary: Colors.black,
+                      colorScheme: ColorScheme.light(
+                        primary: widget.accentColor,
                         onPrimary: Colors.white,
                         onSurface: Colors.black,
                       ),
@@ -895,7 +1084,8 @@ class _DatePickerWidgetState extends State<_DatePickerWidget> {
         decoration: BoxDecoration(
           color: widget.readOnly ? Colors.transparent : Colors.grey.shade50,
           border: Border.all(
-            color: widget.readOnly ? Colors.transparent : Colors.grey.shade300,
+            color: widget.readOnly ? Colors.transparent : Colors.grey.shade200,
+            width: 1.5,
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -911,11 +1101,16 @@ class _DatePickerWidgetState extends State<_DatePickerWidget> {
                     ? Colors.black
                     : Colors.grey.shade500,
                 fontSize: 15,
+                fontWeight: selectedDate != null
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
             ),
             Icon(
-              Icons.calendar_month,
-              color: widget.readOnly ? Colors.grey.shade400 : Colors.black,
+              Icons.calendar_month_rounded,
+              color: widget.readOnly
+                  ? Colors.grey.shade400
+                  : widget.accentColor,
             ),
           ],
         ),
@@ -923,8 +1118,6 @@ class _DatePickerWidgetState extends State<_DatePickerWidget> {
     );
   }
 }
-
-// --- New Draw/Sketch Screen ---
 
 class SketchPadScreen extends StatefulWidget {
   final Function(File) onSave;
@@ -936,6 +1129,7 @@ class SketchPadScreen extends StatefulWidget {
 
 class _SketchPadScreenState extends State<SketchPadScreen> {
   late SignatureController _controller;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -977,21 +1171,34 @@ class _SketchPadScreenState extends State<SketchPadScreen> {
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: ElevatedButton.icon(
-              onPressed: () async {
-                if (_controller.isNotEmpty) {
-                  final bytes = await _controller.toPngBytes();
-                  if (bytes != null) {
-                    final tempDir = await getTemporaryDirectory();
-                    final file = File(
-                      '${tempDir.path}/sketch_${DateTime.now().millisecondsSinceEpoch}.png',
-                    );
-                    await file.writeAsBytes(bytes);
-                    widget.onSave(file);
-                    if (mounted) Navigator.pop(context);
-                  }
-                }
-              },
-              icon: const Icon(Icons.check, size: 18),
+              onPressed: _isSaving
+                  ? null
+                  : () async {
+                      if (_controller.isNotEmpty) {
+                        setState(() => _isSaving = true);
+                        final bytes = await _controller.toPngBytes();
+                        if (bytes != null) {
+                          final tempDir = await getTemporaryDirectory();
+                          final file = File(
+                            '${tempDir.path}/sketch_${DateTime.now().millisecondsSinceEpoch}.png',
+                          );
+                          await file.writeAsBytes(bytes);
+                          await widget.onSave(file);
+                          if (mounted) Navigator.pop(context);
+                        }
+                        if (mounted) setState(() => _isSaving = false);
+                      }
+                    },
+              icon: _isSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.check, size: 18),
               label: const Text("Save"),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black,

@@ -10,6 +10,9 @@ import 'package:mobile_frontend/screens/dashboard/home_dashboard.dart';
 import 'package:mobile_frontend/screens/step_detail/step_detail_screen.dart';
 import 'package:mobile_frontend/screens/dashboard/task_stats_screen.dart';
 import 'package:mobile_frontend/screens/asset/assigned_assets_screen.dart';
+import 'package:mobile_frontend/screens/form/assigned_forms_screen.dart';
+import 'package:mobile_frontend/screens/form/form_detail_screen.dart';
+import 'package:mobile_frontend/models/form/form_model.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // 1. Watch Auth State for changes (Login, Logout, Role change)
@@ -93,6 +96,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/my-assets',
         name: 'my-assets',
         builder: (context, state) => const AssignedAssetsScreen(),
+      ),
+
+      GoRoute(
+        path: '/my-forms',
+        name: 'my-forms',
+        builder: (context, state) => const AssignedFormsScreen(),
+      ),
+      GoRoute(
+        path: '/form-detail',
+        name: 'form-detail',
+        builder: (context, state) {
+          final form = state.extra as FormSubmissionResponse;
+          return FormDetailScreen(initialForm: form);
+        },
       ),
 
       // --- Admin Only Routes (Example) ---

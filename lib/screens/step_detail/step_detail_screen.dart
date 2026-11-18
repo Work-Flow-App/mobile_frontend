@@ -4,6 +4,7 @@ import 'package:mobile_frontend/models/job/job_model.dart';
 import 'package:mobile_frontend/models/job/timeline_model.dart';
 import 'package:mobile_frontend/providers/job/job_provider.dart';
 import 'package:mobile_frontend/widgets/app_branding.dart';
+import 'package:mobile_frontend/widgets/attachment_preview.dart';
 import 'package:mobile_frontend/screens/step_detail/step_detail_controller.dart';
 import 'package:mobile_frontend/screens/step_detail/step_info_section.dart';
 import 'package:mobile_frontend/screens/step_detail/timeline_item_widget.dart';
@@ -785,20 +786,17 @@ class _TimelineBottomSheetState extends ConsumerState<TimelineBottomSheet> {
       itemCount: events.length,
       itemBuilder: (context, index) {
         final event = events[index] as TimelineEvent;
-        final isImage =
-            event.fileUrl?.toLowerCase().contains('.jpg') == true ||
-            event.fileUrl?.toLowerCase().contains('.jpeg') == true ||
-            event.fileUrl?.toLowerCase().contains('.png') == true;
+        final fileUrl = event.fileUrl;
 
         return InkWell(
-          onTap: () async {
-            if (event.fileUrl != null) {
-              await launchUrl(
-                Uri.parse(event.fileUrl!),
-                mode: LaunchMode.externalApplication,
-              );
-            }
-          },
+          onTap: fileUrl == null || fileUrl.isEmpty
+              ? null
+              : () async {
+                  await launchUrl(
+                    Uri.parse(fileUrl),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -820,16 +818,12 @@ class _TimelineBottomSheetState extends ConsumerState<TimelineBottomSheet> {
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(12),
                     ),
-                    child: isImage && event.fileUrl != null
-                        ? Image.network(event.fileUrl!, fit: BoxFit.cover)
-                        : Container(
-                            color: Colors.grey.shade100,
-                            child: Icon(
-                              Icons.insert_drive_file,
-                              size: 48,
-                              color: event.discussionType.color,
-                            ),
-                          ),
+                    child: AttachmentPreview(
+                      fileUrl: fileUrl,
+                      thumbnailUrl: event.thumbnailUrl,
+                      fileName: event.content,
+                      iconColor: event.discussionType.color,
+                    ),
                   ),
                 ),
                 Container(

@@ -68,6 +68,7 @@ class FormFieldValueResponse {
   final bool required;
   final dynamic value;
   final String? fileUrl;
+  final String? thumbnailUrl;
   final String? fileName;
   final List<String> options; // Parsed from JSON string
 
@@ -82,6 +83,7 @@ class FormFieldValueResponse {
     required this.required,
     this.value,
     this.fileUrl,
+    this.thumbnailUrl,
     this.fileName,
     required this.options,
   });
@@ -111,6 +113,7 @@ class FormFieldValueResponse {
       required: json['required'] ?? false,
       value: json['value'],
       fileUrl: json['fileUrl'],
+      thumbnailUrl: json['thumbnailUrl'],
       fileName: json['fileName'],
       options: parsedOptions,
     );

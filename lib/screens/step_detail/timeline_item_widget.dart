@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_frontend/models/job/timeline_model.dart';
+import 'package:mobile_frontend/widgets/attachment_preview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class TimelineItemWidget extends StatelessWidget {
@@ -95,8 +96,9 @@ class TimelineItemWidget extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // FIX: Use isAttachment getter instead of string comparison
-                  if (event.isAttachment || event.fileUrl != null)
+                  if (event.isAttachment ||
+                      event.fileUrl != null ||
+                      event.thumbnailUrl != null)
                     _buildAttachmentContent(context)
                   else
                     _buildCommentContent(),
@@ -132,13 +134,33 @@ class TimelineItemWidget extends StatelessWidget {
   Widget _buildHeader(String name, String time) {
     return Row(
       children: [
-        Text(
-          name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  time,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(width: 8),
-        Text(time, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-        const Spacer(),
         // Type Badge
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -181,12 +203,21 @@ class TimelineItemWidget extends StatelessWidget {
   }
 
   Widget _buildAttachmentContent(BuildContext context) {
-    if (event.fileUrl == null) return const SizedBox();
-
-    final bool hasImage =
-        event.fileUrl!.toLowerCase().contains('.jpg') ||
-        event.fileUrl!.toLowerCase().contains('.jpeg') ||
-        event.fileUrl!.toLowerCase().contains('.png');
+    final fileUrl = event.fileUrl;
+    final preview = AttachmentPreview(
+      fileUrl: fileUrl,
+      thumbnailUrl: event.thumbnailUrl,
+      fileName: event.content,
+    );
+    final VoidCallback? openFile = fileUrl == null || fileUrl.isEmpty
+        ? null
+        : () {
+            if (preview.isImage) {
+              _showFullScreenImage(context, fileUrl);
+            } else {
+              _openFileUrl(context, fileUrl);
+            }
+          };
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 250),
@@ -199,48 +230,22 @@ class TimelineItemWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (hasImage)
-            _buildImageThumbnail(context)
-          else
-            _buildFileTile(context),
+          if (preview.hasSource)
+            InkWell(
+              onTap: openFile,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(height: 150, child: preview),
+              ),
+            ),
+          if (!preview.isImage || !preview.hasSource)
+            _buildFileTile(context, openFile),
         ],
       ),
     );
   }
 
-  Widget _buildImageThumbnail(BuildContext context) {
-    return InkWell(
-      onTap: () => _showFullScreenImage(context, event.fileUrl!),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Hero(
-          tag: 'image_${event.id}',
-          child: Image.network(
-            event.fileUrl!,
-            fit: BoxFit.cover,
-            height: 150,
-            width: double.infinity,
-            loadingBuilder: (ctx, child, progress) => progress == null
-                ? child
-                : Container(
-                    height: 150,
-                    width: double.infinity,
-                    color: Colors.grey[100],
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-            errorBuilder: (_, __, ___) => const SizedBox(
-              height: 100,
-              child: Center(
-                child: Icon(Icons.broken_image, color: Colors.grey),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFileTile(BuildContext context) {
+  Widget _buildFileTile(BuildContext context, VoidCallback? openFile) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Container(
@@ -261,11 +266,13 @@ class TimelineItemWidget extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
       ),
-      subtitle: const Text(
-        "Tap to open",
-        style: TextStyle(fontSize: 11, color: Colors.grey),
-      ),
-      onTap: () => _openFileUrl(context, event.fileUrl!),
+      subtitle: openFile == null
+          ? null
+          : const Text(
+              "Tap to open",
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+      onTap: openFile,
     );
   }
 }

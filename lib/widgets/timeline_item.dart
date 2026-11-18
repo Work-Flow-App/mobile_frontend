@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_frontend/models/job/timeline_model.dart'; // Ensure this imports your updated model
+import 'package:mobile_frontend/widgets/attachment_preview.dart';
 import 'package:intl/intl.dart';
 
 class TimelineItemWidget extends StatelessWidget {
@@ -24,14 +25,6 @@ class TimelineItemWidget extends StatelessWidget {
     final displayName = event.actorId == currentWorkerId
         ? "You"
         : "User #${event.actorId}";
-
-    // Check for image extension
-    final bool hasImage =
-        event.fileUrl != null &&
-        (event.fileUrl!.toLowerCase().endsWith('.jpg') ||
-            event.fileUrl!.toLowerCase().endsWith('.jpeg') ||
-            event.fileUrl!.toLowerCase().endsWith('.png') ||
-            event.fileUrl!.toLowerCase().endsWith('.webp'));
 
     return IntrinsicHeight(
       child: Row(
@@ -82,8 +75,10 @@ class TimelineItemWidget extends StatelessWidget {
                   const SizedBox(height: 8),
 
                   // Body (Attachment vs Text)
-                  if (event.isAttachment)
-                    _buildAttachmentView(hasImage)
+                  if (event.isAttachment ||
+                      event.fileUrl != null ||
+                      event.thumbnailUrl != null)
+                    _buildAttachmentView()
                   else
                     Text(
                       event.content,
@@ -101,7 +96,15 @@ class TimelineItemWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildAttachmentView(bool hasImage) {
+  Widget _buildAttachmentView() {
+    final preview = AttachmentPreview(
+      fileUrl: event.fileUrl,
+      thumbnailUrl: event.thumbnailUrl,
+      fileName: event.content,
+      placeholderColor: Colors.grey.shade800,
+      iconColor: Colors.white54,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -113,47 +116,13 @@ class TimelineItemWidget extends StatelessWidget {
         Container(
           constraints: const BoxConstraints(maxWidth: 200, maxHeight: 200),
           decoration: BoxDecoration(
-            color: Colors.grey.shade800,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.white24),
           ),
-          child: hasImage
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    event.fileUrl!,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    loadingBuilder: (ctx, child, progress) {
-                      if (progress == null) return child;
-                      return const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      );
-                    },
-                    errorBuilder: (ctx, err, stack) => const Center(
-                      child: Icon(Icons.broken_image, color: Colors.white54),
-                    ),
-                  ),
-                )
-              : const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.insert_drive_file,
-                        color: Colors.white54,
-                        size: 40,
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        "File",
-                        style: TextStyle(color: Colors.white54, fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(height: preview.hasSource ? 150 : 72, child: preview),
         ),
-        if (!hasImage) ...[
+        if (!preview.isImage || !preview.hasSource) ...[
           const SizedBox(height: 4),
           Text(
             event.content,

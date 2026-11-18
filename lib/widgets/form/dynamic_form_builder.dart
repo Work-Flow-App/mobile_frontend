@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:signature/signature.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:mobile_frontend/models/form/form_model.dart';
+import 'package:mobile_frontend/widgets/attachment_preview.dart';
 
 class DynamicFormBuilder extends StatefulWidget {
   final FormSubmissionResponse form;
@@ -711,14 +712,17 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
         );
 
       case FormFieldType.FILE:
-        bool isImage =
-            field.fileName != null &&
-            (field.fileName!.toLowerCase().endsWith('.jpg') ||
-                field.fileName!.toLowerCase().endsWith('.png') ||
-                field.fileName!.toLowerCase().endsWith('.jpeg'));
+        final fileUrl = field.fileUrl;
+        final hasFile = fileUrl != null && fileUrl.isNotEmpty;
+        final preview = AttachmentPreview(
+          fileUrl: fileUrl,
+          thumbnailUrl: field.thumbnailUrl,
+          fileName: field.fileName,
+          iconColor: accentColor,
+        );
 
         return FormField<String>(
-          initialValue: field.fileUrl,
+          initialValue: fileUrl,
           validator: shouldValidate
               ? (val) =>
                     (val == null || val.isEmpty) ? 'Please attach a file' : null
@@ -727,12 +731,17 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (field.fileUrl != null)
+                if (hasFile || preview.hasSource)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
                     child: InkWell(
-                      onTap: () =>
-                          _viewAttachment(context, field.fileUrl, isImage),
+                      onTap: hasFile
+                          ? () => _viewAttachment(
+                              context,
+                              fileUrl,
+                              preview.isImage,
+                            )
+                          : null,
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
                         width: double.infinity,
@@ -752,52 +761,22 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                             ),
                           ],
                         ),
-                        child: isImage
-                            ? ClipRRect(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (preview.hasSource)
+                              ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  field.fileUrl!,
-                                  height: 180,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: accentColor.withOpacity(0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        Icons.insert_drive_file_rounded,
-                                        color: accentColor,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        field.fileName ?? "Attached File",
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.black87,
-                                        ),
-                                        // FIX: Allow wrapping for file names
-                                        maxLines: 4,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.open_in_new_rounded,
-                                      color: Colors.grey.shade400,
-                                      size: 20,
-                                    ),
-                                  ],
-                                ),
+                                child: SizedBox(height: 180, child: preview),
                               ),
+                            if (!preview.isImage || !preview.hasSource)
+                              _buildAttachedFileLabel(
+                                field.fileName,
+                                accentColor,
+                                hasFile,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -820,17 +799,17 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
                       child: Column(
                         children: [
                           Icon(
-                            field.fileUrl == null
-                                ? Icons.cloud_upload_rounded
-                                : Icons.change_circle_rounded,
+                            hasFile
+                                ? Icons.change_circle_rounded
+                                : Icons.cloud_upload_rounded,
                             color: accentColor,
                             size: 32,
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            field.fileUrl == null
-                                ? "Tap to Upload or Draw"
-                                : "Replace Attachment",
+                            hasFile
+                                ? "Replace Attachment"
+                                : "Tap to Upload or Draw",
                             style: TextStyle(
                               color: accentColor,
                               fontWeight: FontWeight.bold,
@@ -860,6 +839,46 @@ class DynamicFormBuilderState extends State<DynamicFormBuilder> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildAttachedFileLabel(
+    String? fileName,
+    Color accentColor,
+    bool canOpen,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.insert_drive_file_rounded, color: accentColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              fileName ?? "Attached File",
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (canOpen)
+            Icon(
+              Icons.open_in_new_rounded,
+              color: Colors.grey.shade400,
+              size: 20,
+            ),
+        ],
+      ),
+    );
   }
 
   void _viewAttachment(BuildContext context, String? url, bool isImage) async {

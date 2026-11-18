@@ -43,6 +43,7 @@ class TimelineEvent {
   final String content; // Filename for attachments, text for comments
   final String? description; //for attachments
   final String? fileUrl;
+  final String? thumbnailUrl;
   final int actorId;
   final String? actorUsername;
   final DateTime createdAt;
@@ -54,6 +55,7 @@ class TimelineEvent {
     required this.content,
     this.description,
     this.fileUrl,
+    this.thumbnailUrl,
     required this.actorId,
     this.actorUsername,
     required this.createdAt,
@@ -85,6 +87,7 @@ class TimelineEvent {
       content: json['content'] ?? "",
       description: json['description'],
       fileUrl: json['fileUrl'],
+      thumbnailUrl: json['thumbnailUrl'],
       actorId: json['actorId'] ?? 0,
       actorUsername: json['actorUsername'],
       createdAt:

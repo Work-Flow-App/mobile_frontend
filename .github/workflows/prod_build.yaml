@@ -23,7 +23,9 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.50.1'
           channel: 'stable'
+          cache: true
       - name: Install Dependencies
         run: flutter pub get
       - name: Analyze Flutter Code
@@ -46,7 +48,9 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.50.1'
           channel: 'stable'
+          cache: true
       - name: Install Dependencies
         run: flutter pub get
       - name: Create .env.prod file
@@ -91,7 +95,9 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.50.1'
           channel: 'stable'
+          cache: true
 
       # - name: Install CocoaPods
       # run: sudo gem install cocoapods
